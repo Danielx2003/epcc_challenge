@@ -1,0 +1,98 @@
+#!/bin/bash --login
+#SBATCH --job-name=hpl_run
+#SBATCH --nodes=8       # Adjust 1→8 for scaling
+#SBATCH --ntasks-per-node=128
+#SBATCH --cpus-per-task=1
+#SBATCH --time=00:30:00
+#SBATCH --account=ta210-clusty
+#SBATCH --partition=standard
+#SBATCH --qos=standard
+#SBATCH --output=hpl_run_%j.out
+#SBATCH --error=hpl_run_%j.err
+
+# -----------------------------
+#  Load necessary modules
+# -----------------------------
+module load PrgEnv-gnu 
+module load cray-mpich 
+module load cray-libsci 
+module load mkl
+
+# -----------------------------
+#  Environment setup
+# -----------------------------
+cd /work/ta210/ta210/ta210spic1 || exit 1
+echo "Running HPL in $(pwd)"
+
+HPL_BIN="$(pwd)/hpl-2.3/bin/xhpl"
+ENERGY_FILE="hpl_${SLURM_JOB_ID}_energy.txt"
+
+# -----------------------------
+#  Safety checks
+# -----------------------------
+if [ ! -x "$HPL_BIN" ]; then
+    echo "ERROR: HPL binary not found at $HPL_BIN"
+    exit 1
+fi
+
+if [ ! -f "HPL.dat" ]; then
+    echo "ERROR: HPL.dat not found in current directory"
+    exit 1
+fi
+
+# -----------------------------
+#  Run HPL
+# -----------------------------
+echo "Starting HPL benchmark..."
+srun --ntasks=128 --cpu-bind=cores "$HPL_BIN"
+
+# -----------------------------
+# Collect performance + energy
+# -----------------------------
+
+ENERGY_FILE="hpl_${SLURM_JOB_ID}_energy.txt"
+
+# Extract GFLOPS and N
+GFLOPS_LINES=$(grep "WR" hpl_run_${SLURM_JOB_ID}.out | awk '{print $2, $(NF-1)}')
+
+# Extract energy once (single value per job)
+ENERGY=$(sacct -j ${SLURM_JOB_ID} --noheader --parsable2 --format=ConsumedEnergy | head -n1)
+
+echo ${ENERGY} is the energu :
+
+# Write table header
+{
+    echo "=========================================="
+    echo "HPL Benchmark Summary"
+    echo "=========================================="
+    echo "N   GFLOPS   Energy(J)   GFLOPS/W"
+
+    if [[ -n "$GFLOPS_LINES" && -n "$ENERGY" && "$ENERGY" != "0" ]]; then
+        while read -r N GF; do
+            EFF=$(echo "$GF / $ENERGY" | bc -l)
+            printf "%s %s %s %.4f\n" "$N" "$GF" "$ENERGY" "$EFF"
+        done <<< "$GFLOPS_LINES"
+    else
+        echo "WARNING: Could not compute GFLOPS/W (missing data)"
+        echo "$GFLOPS_LINES"
+        echo "Energy: $ENERGY"
+    fi
+
+    echo "=========================================="
+    echo "Table"
+    echo "=========================================="
+    
+    echo "T/V      N       NB    P    Q      Time    Gflops" >> "$ENERGY_FILE"
+    grep "WR" hpl_run_${SLURM_JOB_ID}.out >> "$ENERGY_FILE"
+
+
+    echo ""
+    echo "=========================================="
+    echo "Contents of HPL.dat (for reference)"
+    echo "=========================================="
+    cat HPL.dat
+    echo ""
+    echo "HPL run finished at $(date)"
+} >> "$ENERGY_FILE"
+
+echo "Finished computing"
