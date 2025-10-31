@@ -1,0 +1,42 @@
+#!/bin/bash
+# ==========================================================
+# organize_hpl.sh
+# Organizes HPL benchmark files into folders per run ID.
+# Each folder will contain:
+#   - hpl_run_<ID>.out
+#   - hpl_run_<ID>.err
+#   - hpl_<ID>_energy.txt  (if present)
+# ==========================================================
+
+# Exit on error, except when moving missing files
+set -e
+
+echo "Organizing HPL files into folders..."
+
+# Loop over all .out files that match hpl_run_*.out
+for out_file in hpl_run_*.out; do
+    # Skip if no files match (to avoid literal filename)
+    [ -e "$out_file" ] || { echo "No hpl_run_*.out files found."; exit 1; }
+
+    # Extract numeric ID from filename
+    id=$(echo "$out_file" | sed -E 's/hpl_run_([0-9]+)\.out/\1/')
+
+    # Make directory for this ID
+    mkdir -p "$id"
+
+    # Move associated files if they exist
+    for ext in out err; do
+        if [ -f "hpl_run_${id}.${ext}" ]; then
+            mv "hpl_run_${id}.${ext}" "$id"/
+        fi
+    done
+
+    if [ -f "hpl_${id}_energy.txt" ]; then
+        mv "hpl_${id}_energy.txt" "$id"/
+    fi
+
+    echo "Moved files for ID ${id} → ${id}/"
+done
+
+echo "✅ Done! All files have been organized."
+

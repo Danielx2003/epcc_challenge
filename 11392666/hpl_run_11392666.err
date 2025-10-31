@@ -1,0 +1,13 @@
+
+Lmod is automatically replacing "cce/16.0.1" with "gcc/11.2.0".
+
+
+Lmod is automatically replacing "PrgEnv-cray/8.4.0" with "PrgEnv-gnu/8.4.0".
+
+
+Due to MODULEPATH changes, the following have been reloaded:
+  1) cray-mpich/8.1.27
+
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd: error: *** STEP 11392666.0 ON nid006696 CANCELLED AT 2025-10-31T14:01:04 ***
+slurmstepd: error: *** JOB 11392666 ON nid006696 CANCELLED AT 2025-10-31T14:01:04 ***
